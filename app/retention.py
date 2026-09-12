@@ -6,6 +6,8 @@ Spec: CLAUDE.md, "Retention".
 
 from __future__ import annotations
 
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -17,6 +19,41 @@ from app.db.connection import DEFAULT_DB_PATH, write_connection
 _JITTER_MAX_S = 1800  # up to 30 minutes, mirrors the collector jobs' jitter intent
 _DOWNSAMPLE_HOURLY_AFTER_DAYS = 7
 _DOWNSAMPLE_DAILY_AFTER_DAYS = 90
+
+
+@dataclass
+class RetentionStatus:
+    """In-process bookkeeping for the retention job, mirroring the columns
+    `sources` tracks per collector. Deliberately NOT persisted to the
+    database: retention isn't a `sources` row, and adding one purely to
+    hang bookkeeping off of would leak a fake "retention" source into
+    /summary's `sections` list, which iterates every enabled `sources` row.
+
+    This means retention's status resets to all-None on every process
+    restart. Accepted limitation for a personal, occasionally-restarted,
+    single-process app -- not something this issue fixes.
+    """
+
+    last_run_at: str | None = None
+    last_ok_at: str | None = None
+    last_error: str | None = None
+    last_duration_ms: int | None = None
+    consecutive_failures: int = 0
+
+
+_status = RetentionStatus()
+
+
+def _format_error(exc: BaseException) -> str:
+    message = str(exc)
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
+
+
+def get_retention_status() -> dict:
+    """A snapshot of the current in-process retention bookkeeping, for the
+    debug page and its API.
+    """
+    return asdict(_status)
 
 
 def _keep_latest_only(conn, source_id: int) -> None:
@@ -88,24 +125,47 @@ def _downsample(conn, source_id: int, now: datetime) -> None:
 
 def enforce_retention(db_path: Path | str = DEFAULT_DB_PATH) -> None:
     """One pass: apply each source's retention policy to its snapshots."""
-    now = datetime.now(timezone.utc)
-    with write_connection(db_path) as conn:
-        conn.execute("BEGIN")
-        try:
-            sources = conn.execute("SELECT id, retention, retention_days FROM sources").fetchall()
-            for source_id, retention, retention_days in sources:
-                if retention == "forever":
-                    continue
-                elif retention == "latest_only":
-                    _keep_latest_only(conn, source_id)
-                elif retention == "days":
-                    _delete_older_than_days(conn, source_id, retention_days, now)
-                elif retention == "downsample":
-                    _downsample(conn, source_id, now)
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
+    global _status
+    started_at = datetime.now(timezone.utc).isoformat()
+    start = time.monotonic()
+    try:
+        now = datetime.now(timezone.utc)
+        with write_connection(db_path) as conn:
+            conn.execute("BEGIN")
+            try:
+                sources = conn.execute("SELECT id, retention, retention_days FROM sources").fetchall()
+                for source_id, retention, retention_days in sources:
+                    if retention == "forever":
+                        continue
+                    elif retention == "latest_only":
+                        _keep_latest_only(conn, source_id)
+                    elif retention == "days":
+                        _delete_older_than_days(conn, source_id, retention_days, now)
+                    elif retention == "downsample":
+                        _downsample(conn, source_id, now)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        _status = RetentionStatus(
+            last_run_at=started_at,
+            last_ok_at=_status.last_ok_at,
+            last_error=_format_error(exc),
+            last_duration_ms=duration_ms,
+            consecutive_failures=_status.consecutive_failures + 1,
+        )
+        raise
+    else:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        _status = RetentionStatus(
+            last_run_at=started_at,
+            last_ok_at=started_at,
+            last_error=_status.last_error,
+            last_duration_ms=duration_ms,
+            consecutive_failures=0,
+        )
 
 
 def register_retention_job(

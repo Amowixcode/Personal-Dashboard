@@ -142,3 +142,95 @@ ul.sections {
     text-align: left;
   }
 }
+
+.source-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.source-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.source-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.source-name {
+  font-weight: 600;
+  min-width: 90px;
+}
+
+.source-interval,
+.source-last-ok,
+.source-failures,
+.source-duration {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Distinct from a merely stale/long-ago source (which just shows a plain
+   muted age): a source that has never once succeeded gets its own accent
+   marker, per the acceptance criterion that these two states must not
+   look the same. */
+.source-row.never-succeeded .source-last-ok {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.source-error {
+  color: var(--accent);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
+.run-now-btn {
+  margin-left: auto;
+  font: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.run-now-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.run-msg {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.runs {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.run-row {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.run-row.run-failed {
+  color: var(--accent);
+}
+
+details > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Dashboard &mdash; Debug</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Debug</h1>
+  <p class="meta"><a href="/">&larr; dashboard</a></p>
+</header>
+
+<main id="debug-app">
+  <p class="empty">Loading&hellip;</p>
+</main>
+
+<script id="initial-debug" type="application/json">{{ debug_json | safe }}</script>
+<script src="/static/debug.js"></script>
+</body>
+</html>
