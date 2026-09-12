@@ -1,0 +1,144 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #767676;
+  --border: #e2e2e2;
+  --accent: #c0392b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181c;
+    --fg: #e8e8e8;
+    --muted: #9a9a9a;
+    --border: #2c2f34;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  max-width: 720px;
+  margin-inline: auto;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.4 system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+section {
+  margin-bottom: 28px;
+}
+
+ul.items,
+ul.sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item,
+.section {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.item.actionable .item-title {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.item-due {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.section-label {
+  font-weight: 600;
+}
+
+.section-message {
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+
+.section-as-of {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.section.status-attention .section-label,
+.section.status-error .section-label {
+  color: var(--accent);
+}
+
+.section.status-stale {
+  opacity: 0.6;
+}
+
+.stale-banner {
+  background: rgba(192, 57, 43, 0.12);
+  color: var(--accent);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .section,
+  .item {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .section-message {
+    text-align: left;
+  }
+}
