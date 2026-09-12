@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from app.config import settings
+from app.db.migrate import run_migrations
 
 
 def configure_logging() -> None:
@@ -30,6 +31,7 @@ def configure_logging() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_migrations()
     yield
 
 
