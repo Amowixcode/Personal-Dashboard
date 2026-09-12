@@ -7,12 +7,13 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic-settings",
+    "apscheduler>=3.10,<4",
+    "httpx",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "httpx",
 ]
 
 [build-system]
