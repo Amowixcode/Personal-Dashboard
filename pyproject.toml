@@ -10,6 +10,7 @@ dependencies = [
     "apscheduler>=3.10,<4",
     "httpx",
     "tzdata",
+    "jinja2",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Personal Dashboard</h1>
+  <p id="generated-at" class="meta">&mdash;</p>
+</header>
+
+<main id="app">
+  <p class="empty">Loading&hellip;</p>
+</main>
+
+<script id="initial-summary" type="application/json">{{ summary_json | safe }}</script>
+<script src="/static/app.js"></script>
+</body>
+</html>
