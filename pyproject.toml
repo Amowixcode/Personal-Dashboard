@@ -9,6 +9,7 @@ dependencies = [
     "pydantic-settings",
     "apscheduler>=3.10,<4",
     "httpx",
+    "tzdata",
 ]
 
 [project.optional-dependencies]
