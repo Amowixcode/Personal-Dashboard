@@ -179,3 +179,38 @@ def test_non_retryable_error_fails_on_first_attempt(tmp_path):
     assert collector.calls == 1
     (row,) = _runs_for(db_path, "flaky")
     assert row[0] == 0
+
+
+def test_concurrent_run_once_calls_are_serialized_by_the_guard(tmp_path):
+    db_path = tmp_path / "test.db"
+    run_migrations(db_path)
+
+    class SlowCollector:
+        name = "slow"
+        interval_s = 60
+        retention = Retention.LATEST_ONLY
+        retention_days = None
+        timeout_s = 5.0
+
+        def __init__(self):
+            self.calls = 0
+
+        async def fetch(self):
+            self.calls += 1
+            await asyncio.sleep(0.05)
+            return {"n": self.calls}
+
+    collector = SlowCollector()
+    register_collectors(db_path, collectors=[collector])
+
+    async def body():
+        return await asyncio.gather(
+            runner.run_once(collector, db_path),
+            runner.run_once(collector, db_path),
+        )
+
+    results = asyncio.run(body())
+
+    assert sorted(results) == [False, True]
+    assert collector.calls == 1
+    assert len(_runs_for(db_path, "slow")) == 1

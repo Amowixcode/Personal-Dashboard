@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
+import app.retention as retention_module
 from app.db.connection import write_connection
 from app.db.migrate import run_migrations
-from app.retention import enforce_retention, register_retention_job
+from app.retention import enforce_retention, get_retention_status, register_retention_job
 from app.collect.runner import build_scheduler
 from app.collect.sources.dummy import DummyCollector
 
@@ -145,3 +148,36 @@ def test_register_retention_job_is_configured_per_spec(tmp_path):
     assert job.max_instances == 1
     assert job.misfire_grace_time is None
     assert job.trigger.interval.total_seconds() == 24 * 3600
+
+
+def test_get_retention_status_reflects_success(tmp_path):
+    db_path = tmp_path / "test.db"
+    run_migrations(db_path)
+
+    enforce_retention(db_path)
+
+    status = get_retention_status()
+    assert status["last_run_at"] is not None
+    assert status["last_ok_at"] is not None
+    assert status["consecutive_failures"] == 0
+
+
+def test_get_retention_status_reflects_failure_and_reraises(tmp_path, monkeypatch):
+    db_path = tmp_path / "test.db"
+    run_migrations(db_path)
+
+    def _boom(conn, source_id):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(retention_module, "_keep_latest_only", _boom)
+    with write_connection(db_path) as conn:
+        conn.execute("BEGIN")
+        _insert_source(conn, "archive", "latest_only")
+        conn.commit()
+
+    with pytest.raises(RuntimeError):
+        enforce_retention(db_path)
+
+    status = get_retention_status()
+    assert "disk full" in status["last_error"]
+    assert status["consecutive_failures"] >= 1

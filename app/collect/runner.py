@@ -32,6 +32,8 @@ _JITTER_MAX_S = 30
 _RETRY_ATTEMPTS = 3  # one initial attempt + two retries
 _RETRY_BASE_DELAY_S = 1.0  # doubles each retry: 1s, then 2s
 
+_running: set[str] = set()
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -195,24 +197,45 @@ def _record_failure(db_path, name: str, started_at: str, duration_ms: int, error
             raise
 
 
-async def run_once(collector: Collector, db_path: Path | str = DEFAULT_DB_PATH) -> None:
+async def run_once(collector: Collector, db_path: Path | str = DEFAULT_DB_PATH) -> bool:
     """Run one collector once. Never raises: a collector's failure must
     never affect another collector's job or the scheduler.
-    """
-    started_at = _now_iso()
-    start = time.monotonic()
-    try:
-        try:
-            payload = await _fetch_with_retry(collector)
-        except Exception as exc:
-            duration_ms = int((time.monotonic() - start) * 1000)
-            _record_failure(db_path, collector.name, started_at, duration_ms, _format_error(exc))
-            return
 
-        duration_ms = int((time.monotonic() - start) * 1000)
-        _record_success(db_path, collector.name, started_at, duration_ms, payload)
-    except Exception:
-        logger.exception("run_once: unexpected error running collector %r", collector.name)
+    Returns False without doing anything -- no fetch, no bookkeeping
+    writes -- if this collector is already running. Both the scheduler's
+    own tick and a manual run-now call go through this same function, so
+    this in-process guard is what makes "mid-run cannot be triggered
+    again" hold for both paths; APScheduler's own max_instances=1 only
+    governs its own scheduled invocations of the registered job, not an
+    ad hoc direct call like the run-now endpoint's.
+
+    Returns True once an attempt was actually made, whether the fetch
+    itself succeeded or failed.
+    """
+    if collector.name in _running:
+        logger.info("run_once: %r already running, skipping this trigger", collector.name)
+        return False
+
+    _running.add(collector.name)
+    try:
+        started_at = _now_iso()
+        start = time.monotonic()
+        try:
+            try:
+                payload = await _fetch_with_retry(collector)
+            except Exception as exc:
+                duration_ms = int((time.monotonic() - start) * 1000)
+                _record_failure(db_path, collector.name, started_at, duration_ms, _format_error(exc))
+                return True
+
+            duration_ms = int((time.monotonic() - start) * 1000)
+            _record_success(db_path, collector.name, started_at, duration_ms, payload)
+            return True
+        except Exception:
+            logger.exception("run_once: unexpected error running collector %r", collector.name)
+            return True
+    finally:
+        _running.discard(collector.name)
 
 
 def build_scheduler(
