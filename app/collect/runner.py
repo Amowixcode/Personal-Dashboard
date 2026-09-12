@@ -23,6 +23,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.collect.base import Collector
 from app.db.connection import DEFAULT_DB_PATH, write_connection
+from app.project.base import Snapshot
+from app.project.reproject import apply_overrides, project_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -94,19 +96,21 @@ def _record_success(db_path, name: str, started_at: str, duration_ms: int, paylo
                 (source_id,),
             ).fetchone()
 
+            new_snapshot_id = None
             if newest is not None and newest[1] == payload_hash:
                 conn.execute(
                     "UPDATE snapshots SET last_seen_at = ? WHERE id = ?",
                     (finished_at, newest[0]),
                 )
             else:
-                conn.execute(
+                cur = conn.execute(
                     """
                     INSERT INTO snapshots (source_id, fetched_at, last_seen_at, payload_hash, payload)
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (source_id, finished_at, finished_at, payload_hash, payload_json),
                 )
+                new_snapshot_id = cur.lastrowid
 
             conn.execute(
                 """
@@ -127,6 +131,31 @@ def _record_success(db_path, name: str, started_at: str, duration_ms: int, paylo
                 """,
                 (finished_at, finished_at, duration_ms, source_id),
             )
+
+            if new_snapshot_id is not None:
+                # Projection is best-effort and isolated in its own
+                # savepoint: raw snapshot capture is the reason payloads
+                # are stored at all, and a broken projector must never
+                # prevent that capture from being committed.
+                conn.execute("SAVEPOINT project_new_snapshot")
+                try:
+                    snapshot = Snapshot(
+                        id=new_snapshot_id,
+                        source_id=source_id,
+                        fetched_at=datetime.fromisoformat(finished_at),
+                        last_seen_at=datetime.fromisoformat(finished_at),
+                        payload=payload,
+                    )
+                    project_snapshot(conn, source_id, name, snapshot)
+                    apply_overrides(conn, source_id=source_id)
+                except Exception:
+                    conn.execute("ROLLBACK TO project_new_snapshot")
+                    logger.exception(
+                        "projection failed for source %r snapshot %s", name, new_snapshot_id
+                    )
+                finally:
+                    conn.execute("RELEASE project_new_snapshot")
+
             conn.commit()
         except Exception:
             conn.rollback()

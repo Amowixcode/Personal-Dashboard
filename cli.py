@@ -6,6 +6,7 @@ import uvicorn
 
 from app.db.migrate import run_migrations
 from app.main import configure_logging
+from app.project.reproject import reproject
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
@@ -26,6 +27,18 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reproject(args: argparse.Namespace) -> int:
+    configure_logging()
+    logger = logging.getLogger(__name__)
+    try:
+        reproject(args.source)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    logger.info("reprojected source %r", args.source)
+    return 0
+
+
 def cmd_not_implemented(name: str):
     def _inner(args: argparse.Namespace) -> int:
         print(f"{name}: not implemented yet", file=sys.stderr)
@@ -40,7 +53,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("serve").set_defaults(func=cmd_serve)
     sub.add_parser("migrate").set_defaults(func=cmd_migrate)
-    sub.add_parser("reproject").set_defaults(func=cmd_not_implemented("reproject"))
+
+    reproject_parser = sub.add_parser("reproject")
+    reproject_parser.add_argument("source")
+    reproject_parser.set_defaults(func=cmd_reproject)
+
     sub.add_parser("backup").set_defaults(func=cmd_not_implemented("backup"))
 
     return parser
