@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from app.api.summary import router as summary_router
 from app.config import settings
 from app.db.migrate import run_migrations
 
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(summary_router)
 
 
 @app.get("/health")
