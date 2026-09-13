@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from app.api.items import router as items_router
 from app.api.summary import build_summary
 from app.api.summary import router as summary_router
 from app.config import settings
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(summary_router)
+app.include_router(items_router)
 app.mount("/static", StaticFiles(directory=_WEB_DIR / "static"), name="static")
 
 
