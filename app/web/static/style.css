@@ -70,10 +70,15 @@ ul.sections {
 .item,
 .section {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.item-title {
+  flex: 1;
 }
 
 .item.actionable .item-title {
@@ -85,6 +90,42 @@ ul.sections {
   color: var(--muted);
   font-size: 0.85rem;
   white-space: nowrap;
+}
+
+.item-star,
+.item-dismiss {
+  flex: none;
+  font: inherit;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.item-star.active {
+  color: var(--accent);
+}
+
+.item-dismiss:hover {
+  color: var(--accent);
+}
+
+#command-field {
+  display: block;
+  width: 100%;
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  margin-bottom: 16px;
+}
+
+#focus-line {
+  margin-bottom: 8px;
 }
 
 .section-label {

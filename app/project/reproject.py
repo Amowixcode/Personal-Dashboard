@@ -22,7 +22,17 @@ from app.project.registry import get_projector
 logger = logging.getLogger(__name__)
 
 _ITEM_ENTITY_TYPE = "item"
-_OVERRIDABLE_FIELDS = {"title", "detail", "due_at", "actionable", "section", "completed_at"}
+# Public: app.api.items reuses this set as the allow-list of fields a PATCH
+# may write, so both modules agree on what "an overridable field" means.
+OVERRIDABLE_FIELDS = {
+    "title",
+    "detail",
+    "due_at",
+    "actionable",
+    "section",
+    "completed_at",
+    "dismissed_at",
+}
 
 
 def project_snapshot(conn, source_id: int, source_name: str, snapshot: Snapshot) -> None:
@@ -79,7 +89,7 @@ def apply_overrides(conn, source_id: int | None = None) -> None:
         params.append(source_id)
 
     for row_source_id, external_id, field, value in conn.execute(query, params).fetchall():
-        if field not in _OVERRIDABLE_FIELDS:
+        if field not in OVERRIDABLE_FIELDS:
             logger.warning("apply_overrides: ignoring unknown field %r", field)
             continue
         conn.execute(

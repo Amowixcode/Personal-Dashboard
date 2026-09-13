@@ -6,10 +6,13 @@ that is the client's job, which is what lets this endpoint be cached and the
 front page paint immediately. Reads only (via read_connection: no write
 lock, no lock contention with a running collector), no network calls.
 
-`next_event` and `focus` are always null in this issue: nothing in the repo
-yet populates a calendar-derived "next event" or lets the user mark an item
-as the day's focus (that's issue 8's write endpoints). Returning null here is
-correct, not a placeholder to fill in later without an issue for it.
+`next_event` is always null in this issue: nothing in the repo yet
+populates a calendar-derived "next event". Returning null here is correct,
+not a placeholder to fill in later without an issue for it. `focus` is
+populated from the single-row `focus` table that issue 8's PATCH
+/api/items/{id} writes to (see app.api.items) -- a focused item that has
+since been completed or dismissed reads back as no focus, rather than
+resurrecting it in the response.
 
 `sections` has one entry per enabled source (per the issue's own scope text:
 status is "derived from sources.last_ok_at age and consecutive_failures"),
@@ -132,13 +135,15 @@ def build_summary(db_path: Path | str | None = None) -> dict[str, Any]:
     with read_connection(db_path) as conn:
         today_rows = conn.execute(
             "SELECT id, kind, title, due_at, actionable FROM items "
-            "WHERE completed_at IS NULL AND due_at >= ? AND due_at < ? ORDER BY due_at ASC",
+            "WHERE completed_at IS NULL AND dismissed_at IS NULL "
+            "AND due_at >= ? AND due_at < ? ORDER BY due_at ASC",
             (_iso_z(today_start), _iso_z(today_end)),
         ).fetchall()
 
         week_rows = conn.execute(
             "SELECT id, kind, title, due_at, actionable FROM items "
-            "WHERE completed_at IS NULL AND due_at >= ? AND due_at < ? ORDER BY due_at ASC",
+            "WHERE completed_at IS NULL AND dismissed_at IS NULL "
+            "AND due_at >= ? AND due_at < ? ORDER BY due_at ASC",
             (_iso_z(today_end), _iso_z(week_end)),
         ).fetchall()
 
@@ -146,6 +151,12 @@ def build_summary(db_path: Path | str | None = None) -> dict[str, Any]:
             "SELECT name, interval_s, last_ok_at, last_error, consecutive_failures "
             "FROM sources WHERE enabled = 1"
         ).fetchall()
+
+        focus_row = conn.execute(
+            "SELECT items.id, items.title FROM focus "
+            "JOIN items ON items.id = focus.item_id "
+            "WHERE focus.id = 1 AND items.completed_at IS NULL AND items.dismissed_at IS NULL"
+        ).fetchone()
 
     sections = []
     stale_sources = []
@@ -160,7 +171,7 @@ def build_summary(db_path: Path | str | None = None) -> dict[str, Any]:
     return {
         "generated_at": _now_iso_z(),
         "next_event": None,
-        "focus": None,
+        "focus": {"id": focus_row[0], "title": focus_row[1]} if focus_row else None,
         "today": [_row_to_item(r) for r in today_rows],
         "this_week": [_row_to_item(r) for r in week_rows],
         "sections": sections,
